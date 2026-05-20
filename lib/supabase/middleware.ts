@@ -25,30 +25,48 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Always use getUser() — it validates the token with Supabase's servers.
-  // Never use getSession() in server code — it only reads cookies and can be spoofed.
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
 
-  // Add any routes that require login to this array
-  const protectedRoutes = ['/dashboard']
-  const isProtected = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
-  )
+  const isAdminArea = pathname.startsWith('/admin')
+  const isAdminLogin = pathname === '/admin/login' || pathname.startsWith('/admin/login/')
 
-  if (isProtected && !user) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/login'
-    redirectUrl.searchParams.set('redirectedFrom', pathname)
-    return NextResponse.redirect(redirectUrl)
+  if (isAdminArea && !isAdminLogin) {
+    if (!user) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/admin/login'
+      redirectUrl.searchParams.set('redirectedFrom', pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // Allowlist check: is the signed-in user in admin_users?
+    const { data: row } = await supabase
+      .from('admin_users')
+      .select('id')
+      .ilike('email', user.email ?? '')
+      .maybeSingle()
+
+    if (!row) {
+      await supabase.auth.signOut()
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/admin/login'
+      redirectUrl.searchParams.set('error', 'not_authorised')
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
-  // Redirect logged-in users away from auth pages
-  if ((pathname === '/login' || pathname === '/signup') && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (isAdminLogin && user) {
+    const { data: row } = await supabase
+      .from('admin_users')
+      .select('id')
+      .ilike('email', user.email ?? '')
+      .maybeSingle()
+    if (row) {
+      return NextResponse.redirect(new URL('/admin', request.url))
+    }
   }
 
   return response
