@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,7 @@ const GoogleG = () => (
   </svg>
 )
 
-export default function AdminLoginPage() {
+function AdminLoginForm() {
   const params = useSearchParams()
   const errorParam = params.get('error')
   const redirectedFrom = params.get('redirectedFrom')
@@ -183,5 +183,13 @@ export default function AdminLoginPage() {
         )}
       </div>
     </main>
+  )
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense>
+      <AdminLoginForm />
+    </Suspense>
   )
 }
